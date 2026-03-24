@@ -1,0 +1,19 @@
+{
+  "id": 11893,
+  "team": {
+    "id": 9565,
+    "name": "Vitality"
+  },
+  "image": "https://img-cdn.hltv.org/playerbodyshot/R3MF_lTsMVSw1w6K744i91.png?ixlib=java-2.1.0&w=400&s=00f5abe7c10a1cb7ba784147d0ac00cf",
+  "nickname": "ZywOo",
+  "name": "Mathieu Herbaut",
+  "age": 21,
+  "rating": 1.33,
+  "impact": 1.45,
+  "dpr": 0.61,
+  "adr": 87.9,
+  "kast": 75,
+  "kpr": 0.85,
+  "headshots": 41.1,
+  "mapsPlayed": 1066
+}
