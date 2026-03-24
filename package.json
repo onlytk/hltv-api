@@ -17,7 +17,9 @@
     "test:w": "yarn test --watch",
     "prebuild": "rimraf dist",
     "build": "tsc -p .",
-    "build:w": "tsc -p . -w"
+    "build:w": "tsc -p . -w",
+    "start": "node dist/server.js",
+    "dev": "tsc -p . && node dist/server.js"
   },
   "files": [
     "dist",
