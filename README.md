@@ -1,211 +1,93 @@
-# DEPRECATED
+# HLTV API
 
-This repository is no longer maintained.
+REST API for [HLTV.org](https://www.hltv.org) CS2 esports data. Uses Playwright with stealth to bypass Cloudflare protection.
 
-## HLTV API
-
-[![Build Status](https://travis-ci.org/dajk/hltv-api.svg?branch=master)](https://travis-ci.org/dajk/hltv-api)
-[![npm](https://img.shields.io/npm/v/hltv-api.svg)](http://npm.im/hltv-api)
-[![Codecov](https://img.shields.io/codecov/c/github/dajk/hltv-api.svg?maxAge=2592000)](https://codecov.io/gh/dajk/hltv-api)
-[![dependencies Status](https://david-dm.org/dajk/hltv-api/status.svg)](https://david-dm.org/dajk/hltv-api)
-[![devDependencies Status](https://david-dm.org/dajk/hltv-api/dev-status.svg)](https://david-dm.org/dajk/hltv-api?type=dev)
-
-This is my experimental project, but also small useful module for node.js which helps you to easy implement data from popular CS:GO website [hltv.org](http://www.hltv.org/).
-
-### Installation
+## Setup
 
 ```bash
-$ npm install hltv-api
+npm install --legacy-peer-deps
+npx playwright install chromium
+npm run build
 ```
 
-### Methods
+## Run
 
-1. [`getNews`](#news)
-2. [`getResults`](#results)
-3. [`getMatches`](#matches)
-4. [`getMatchById`](#match-stats)
-5. [`getTopPlayers`](#top-players)
-6. [`getPlayerById`](#player-stats)
-7. [`getTopTeams`](#top-teams)
-8. [`getTeamById`](#single-team)
-
-> Check all the available methods and responses: https://hltv-api.vercel.app/
-
-### How to use
-
-**Simple API example**
-
-- Using CommonJS module:
-
-```js
-const HLTV = require('hltv-api').default
-const express = require('express')
-const app = express()
-
-app.get('/', async (req, res) => {
-  const news = await HLTV.getNews()
-  res.json(news)
-})
-
-app.listen(3000, () => {
-  console.log('Listening on port 3000...')
-})
+```bash
+npm start
+# → http://localhost:3000
 ```
 
-- Using babel and necessary plugins ([demo app](/examples/with-babel/))
-
-```js
-import HLTV from 'hltv-api'
+Custom port:
+```bash
+PORT=8080 npm start
 ```
 
-#### **News**
+## API Endpoints
 
-```js
-app.get('/', async (req, res) => {
-  const news = await HLTV.getNews()
-  res.json(news)
-})
+| Endpoint | Description |
+|----------|-------------|
+| `GET /api/matches` | All matches (live + upcoming) |
+| `GET /api/matches?eventId=1234` | Matches for a specific event |
+| `GET /api/matches/live` | Live matches only |
+| `GET /api/matches/upcoming` | Upcoming matches only |
+| `GET /api/match/:id` | Match details with player stats |
+| `GET /api/results` | Recent match results |
+| `GET /api/players` | Top player rankings |
+| `GET /api/player/:id` | Player details |
+| `GET /api/players/search?name=s1mple` | Search players by name |
+| `GET /api/teams` | Team rankings |
+| `GET /api/team/:id` | Team details with roster |
+| `GET /api/news` | Latest HLTV news |
+
+## Example Response
+
+### `GET /api/matches/live`
+
+```json
+[
+  {
+    "id": 2391946,
+    "time": "2026-03-24T11:00:00.000Z",
+    "event": {
+      "name": "ROG JOURNEY Spring 2026",
+      "logo": "https://img-cdn.hltv.org/..."
+    },
+    "stars": 0,
+    "maps": "bo3",
+    "teams": [
+      { "id": 12604, "name": "Johnny Speeds", "logo": "..." },
+      { "id": 13364, "name": "Famalicão", "logo": "..." }
+    ],
+    "live": true
+  }
+]
 ```
 
-- request
+## Use as Library
 
-```
-http://localhost:3000/
-```
+```javascript
+const hltv = require('./dist/index').default;
+const { init, close } = require('./dist/browser');
 
-- response
-
-https://hltv-api.vercel.app/api/news.json
-
-#### **Results**
-
-```js
-app.get('/results', async (req, res) => {
-  const results = await HLTV.getResults()
-  res.json(results)
-})
-```
-
-- request
-
-```
-http://localhost:3000/results
+(async () => {
+  await init();
+  
+  const matches = await hltv.getMatches();
+  const results = await hltv.getResults();
+  const teams = await hltv.getTopTeams();
+  
+  console.log(matches);
+  
+  await close();
+})();
 ```
 
-- response
+## Tech Stack
 
-https://hltv-api.vercel.app/api/results.json
+- **Playwright** + stealth plugin — headless browser for Cloudflare bypass
+- **Cheerio** — HTML parsing
+- **TypeScript** — type-safe source
 
-#### **Matches**
+## License
 
-```js
-app.get('/matches', async (req, res) => {
-  const matches = await HLTV.getMatches()
-  res.json(matches)
-})
-```
-
-- request
-
-```
-http://localhost:3000/matches
-```
-
-- response
-
-https://hltv-api.vercel.app/api/matches.json
-
-#### **Match Stats**
-
-```js
-app.get('/results/:matchId/stats', async (req, res) => {
-  const stats = await HLTV.getMatchById(req.params.matchId)
-  res.json(stats)
-})
-```
-
-- request
-
-```
-http://localhost:3000/stats/matches/2316387
-```
-
-- response
-
-https://hltv-api.vercel.app/api/match.json
-
-#### **Top Players**
-
-```js
-app.get('/players', async (req, res) => {
-  const players = await HLTV.getTopPlayers()
-  res.json(players)
-})
-```
-
-- request
-
-```
-http://localhost:3000/players
-```
-
-- response
-
-https://hltv-api.vercel.app/api/players.json
-
-#### **Player Stats**
-
-```js
-app.get('/players/:playerId', async (req, res) => {
-  const player = await HLTV.getPlayerById(req.params.playerId)
-  res.json(player)
-})
-```
-
-- request
-
-```
-http://localhost:3000/players/11893
-```
-
-- response
-
-https://hltv-api.vercel.app/api/player.json
-
-#### **Top Teams**
-
-```js
-app.get('/top-teams', async (req, res) => {
-  const teams = await HLTV.getTopTeams()
-  res.json(teams)
-})
-```
-
-- request
-
-```
-http://localhost:3000/top-teams
-```
-
-- response
-
-https://hltv-api.vercel.app/api/teams.json
-
-#### **Single Team**
-
-```js
-app.get('/teams/:teamId', async (req, res) => {
-  const team = await HLTV.getTeamById(req.params.teamId)
-  res.json(team)
-})
-```
-
-- request
-
-```
-http://localhost:3000/teams/11893
-```
-
-- response
-
-https://hltv-api.vercel.app/api/team.json
+MIT
