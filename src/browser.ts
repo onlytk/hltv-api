@@ -1,12 +1,19 @@
 import { chromium } from 'playwright-extra'
 import stealth from 'puppeteer-extra-plugin-stealth'
-import type { Browser, BrowserContext } from 'playwright-core'
+import type { Browser, BrowserContext, Page } from 'playwright-core'
 
 // Add stealth plugin to playwright
 chromium.use(stealth())
 
 let browser: Browser | null = null
 let context: BrowserContext | null = null
+
+// Cache: url -> { html, timestamp }
+const cache: Map<string, { html: string; ts: number }> = new Map()
+const CACHE_TTL_MS = 60 * 1000 // 60 seconds
+
+// Keep a persistent page alive to maintain cookies/session
+let warmPage: Page | null = null
 
 /**
  * Initialize the browser instance
@@ -45,70 +52,106 @@ export async function init(): Promise<void> {
       'Upgrade-Insecure-Requests': '1',
     },
   })
+
+  // Warm up: visit HLTV once to pass Cloudflare and establish cookies
+  console.log('⏳ Warming up HLTV session...')
+  warmPage = await context.newPage()
+  await warmPage.goto('https://www.hltv.org', {
+    waitUntil: 'domcontentloaded',
+    timeout: 60000,
+  })
+
+  // Wait for Cloudflare to pass
+  const maxAttempts = 40
+  for (let i = 0; i < maxAttempts; i++) {
+    const html = await warmPage.content()
+    if (!html.includes('challenge-platform') && !html.includes('cf-browser-verification')) {
+      console.log('✅ HLTV session warmed up, Cloudflare passed')
+      break
+    }
+    await warmPage.waitForTimeout(500)
+  }
 }
 
 /**
  * Get HTML content from a URL using the shared browser context
+ * Uses cache to avoid hammering HLTV
  */
 export async function fetchHTML(url: string): Promise<string> {
+  // Check cache first
+  const cached = cache.get(url)
+  if (cached && (Date.now() - cached.ts) < CACHE_TTL_MS) {
+    return cached.html
+  }
+
   if (!context) {
     await init()
   }
 
   const page = await context!.newPage()
-  
+
   try {
-    // Navigate to the page
-    const response = await page.goto(url, { 
+    await page.goto(url, {
       waitUntil: 'domcontentloaded',
-      timeout: 60000 
+      timeout: 60000,
     })
-    
-    // If we got a response, wait for the page to stabilize
-    if (response) {
-      // Wait for network to be mostly idle
-      await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {
-        // Ignore timeout, continue anyway
-      })
-    }
-    
+
+    // Wait for network to settle
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {})
+
     // Wait for Cloudflare challenge to complete
     const maxAttempts = 40
     const checkInterval = 500
-    
+
     for (let i = 0; i < maxAttempts; i++) {
       const html = await page.content()
-      
-      // Check if we're past the Cloudflare challenge
+
       if (!html.includes('challenge-platform') && !html.includes('cf-browser-verification')) {
-        // Success! Wait a tiny bit more for final rendering
         await page.waitForTimeout(1000)
-        return await page.content()
+        const finalHtml = await page.content()
+
+        // Cache the result
+        cache.set(url, { html: finalHtml, ts: Date.now() })
+        return finalHtml
       }
-      
-      // Still in challenge, wait and retry
+
       await page.waitForTimeout(checkInterval)
     }
-    
-    // Timeout waiting for challenge - return what we have
-    return await page.content()
-    
+
+    // Return what we have even if challenge didn't pass
+    const html = await page.content()
+    return html
+
   } finally {
     await page.close()
   }
 }
 
 /**
+ * Clear the cache (useful if you want fresh data)
+ */
+export function clearCache(): void {
+  cache.clear()
+}
+
+/**
  * Close the browser instance
  */
 export async function close(): Promise<void> {
+  if (warmPage) {
+    await warmPage.close().catch(() => {})
+    warmPage = null
+  }
+
   if (context) {
-    await context.close()
+    await context.close().catch(() => {})
     context = null
   }
-  
+
   if (browser) {
-    await browser.close()
+    await browser.close().catch(() => {})
     browser = null
   }
+
+  cache.clear()
 }

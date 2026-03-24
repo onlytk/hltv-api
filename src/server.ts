@@ -1,6 +1,6 @@
 import http from 'http'
 import { URL } from 'url'
-import { init, close } from './browser'
+import { init, close, clearCache } from './browser'
 import { getMatches } from './matches'
 import { getMatchById } from './match'
 import { getResults } from './results'
@@ -100,6 +100,12 @@ const server = http.createServer(async (req, res) => {
     if (path === '/api/news') {
       const data = await getRSS('news')
       return json(res, data)
+    }
+
+    // POST /api/cache/clear — clear response cache
+    if (path === '/api/cache/clear') {
+      clearCache()
+      return json(res, { ok: true, message: 'Cache cleared' })
     }
 
     // GET / — API docs
